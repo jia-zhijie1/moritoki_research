@@ -44,6 +44,8 @@ alpha = (r-q-1)/2
 beta = alpha**2 + r
 len_partition = T / num_partition
 
+torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
 
 #CPUとGPUどっちも使えるようにするやつ(Macはそんなに意味ないかも)
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -206,7 +208,7 @@ def main():
         value_df.to_csv(file_path+"/to_csv_out_{}.csv".format(i))
 
         X = data_gen(n = num_data)[0]
-        y = model(X).clone().detach().requires_grad_(True)
+        y = model(X).clone().detach().requires_grad_(True).to(device)
         pre_model = model
         pre_model = pre_model.to(device)
         dataset = TensorDataset(X, y)
