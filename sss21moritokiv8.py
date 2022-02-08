@@ -44,7 +44,6 @@ alpha = (r-q-1)/2
 beta = alpha**2 + r
 len_partition = T / num_partition
 
-torch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 
 #CPUとGPUどっちも使えるようにするやつ(Macはそんなに意味ないかも)
