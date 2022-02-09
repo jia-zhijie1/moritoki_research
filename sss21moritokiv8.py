@@ -151,12 +151,12 @@ def main():
         Us = model(testdata_X).cpu().clone().detach().numpy().flatten().tolist()
         
         #t偏微分 (model(X) - pre_model(X)) / len_partition
-        t_diff = (pre_model(testdata_X).to(device) - model(testdata_X)) / len_partition
+        t_diff = (pre_model(testdata_X).to(device) - model(testdata_X).to(device)) / len_partition
         t_diffs = t_diff.cpu().clone().detach().numpy().flatten().tolist()
         #t_diffs.append(t_diff)
 
         #x1階偏微分
-        x_diff = differential(model,testdata_X)
+        x_diff = differential(model,testdata_X).to(device)
         x_diffs = x_diff.cpu().clone().detach().numpy().flatten().tolist()
 
         # x2階偏微分 sec_diff(model,X)
@@ -206,7 +206,7 @@ def main():
         #macならこっち
         value_df.to_csv(file_path+"/to_csv_out_{}.csv".format(i))
 
-        X = data_gen(n = num_data)[0]
+        X = data_gen(n = num_data)[0].to(device)
         y = model(X).clone().detach().requires_grad_(True).to(device)
         pre_model = model
         pre_model = pre_model.to(device)

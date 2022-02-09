@@ -23,7 +23,7 @@ for i in range(num_partition):
     #df = pd.read_csv(filepath_or_buffer="/Users/mk042.DESKTOP-K9G0PKU/Desktop/sss21moritoki/csv_experiment/to_csv_out_{}.csv".format(i), encoding="ms932", sep=",")
 
     #mac版
-    df = pd.read_csv(filepath_or_buffer="/Users/garammasala/reaserch/csv12/to_csv_out_{}.csv".format(i), encoding="ms932", sep=",")
+    df = pd.read_csv(filepath_or_buffer="experiment1/to_csv_out_{}.csv".format(i), encoding="ms932", sep=",")
     #df = df.sort_values(by="X",ascending=False)
     #df["boundary_check"] = [x ** 2 for x in df["boundary_check"]]
     """min_number = df["boundary_check"].idxmin()
