@@ -83,7 +83,7 @@ def phi(X):
 #データを生成(dataloaderとdatageneratorを使う)
 def data_gen(n=1000):
     X = torch.tensor(np.random.uniform(
-        low=a, high=b, size=n).reshape(n, 1), requires_grad = False, dtype=torch.float32)
+        low=a, high=b, size=n).reshape(n, 1), requires_grad = True, dtype=torch.float32)
     y = phi(X)
     dataset = TensorDataset(X, y)
     dataloder = DataLoader(dataset, batch_size=100, shuffle=True)
@@ -111,13 +111,14 @@ class CustomLoss(nn.Module):
         super().__init__()
 
     def forward(self, output, target, diff, Phi):
-        loss = ((target - output)**2 / len_partition + diff**2 + beta * output**2 + (1/epsilon) * F.relu(Phi-output)).mean()
+        loss = (1/(b-a)) * ((target - output)**2 / len_partition + diff**2 + beta * output**2 + (1/epsilon) * F.relu(Phi-output)).mean()
         #loss = ((target - output)**2 / len_partition + diff**2 + beta * output**2).mean()
         return loss
 
 
 def main():
-    traindataloder = data_gen(n = num_data)[1]
+    X,traindataloder = data_gen(n = num_data)
+    X = X.to(device)
     pre_model = phi
     file_path = mk_folder.mk_folder(T=T, num_partition=num_partition)
     
@@ -141,7 +142,6 @@ def main():
                 diff = (model(inputs + h) - model(inputs - h)) / (2 * h)
                 Phi = phi(inputs).to(device)
                 loss = criterion(output, target, diff,Phi)
-                #print(loss)
                 loss.backward()
                 optimizer.step()
 
@@ -206,7 +206,6 @@ def main():
         #macならこっち
         value_df.to_csv(file_path+"/to_csv_out_{}.csv".format(i))
 
-        X = data_gen(n = num_data)[0].to(device)
         y = model(X).clone().detach().requires_grad_(True).to(device)
         pre_model = model
         pre_model = pre_model.to(device)
