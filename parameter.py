@@ -6,17 +6,26 @@ num_partition = 100 #number of partition
 learning_rate = 0.01
 
 #結果に関係するパラメータ
-a = -5 #一様分布
-b = (-1)*a #一様分布
-K = 15 #行使価格
-T = 1 #expiration
+K = 0.2 #行使価格
 epsilon = 1e-1
 
+
+#processに関するパラメータ
+num_path = 3
+T = 1 #expiration
+alpha = 1.2
+mu = 0
+sigma = 2.3
+x_0 = 0
 
 
 h = 1e-2
 r = 0.01 #interest rate
 q = 0.008 #dividend
-alpha = (r-q-1)/2
+#alpha = (r-q-1)/2
 beta = alpha**2 + r
 len_partition = T / num_partition
+
+#多分もう使わないパラメータ
+a = -5 #一様分布
+b = (-1)*a #一様分布
