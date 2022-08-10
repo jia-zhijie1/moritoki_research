@@ -11,9 +11,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import csv
 
-#他ファイル
-import parameter
+#
+#from functorch import grad, vmap, vjp, jacrev
+from torch.autograd import grad
+
+#OU_Processを生成するファイル
 import OU_model_generator
+simulate_OU = OU_model_generator.simulate_OU
 
 #学習時間を計測
 import time
@@ -21,26 +25,35 @@ import time
 from tqdm import tqdm
 
 #各種パラメータ
-num_epoch = parameter.num_epoch
-num_data = parameter.num_data
-num_partition = parameter.num_partition
-epsilon = parameter.epsilon
-learning_rate = parameter.learning_rate
-num_testdata = 5000
+#parameter.jsonを参照する
+import json
+with open('parameter.json') as p:
+    parameter = json.load(p)
 
-a = -1  #一様分布
-b = 1  #一様分布
-K = 0.2  #行使価格
+num_epoch = parameter["Deep_Learning"]["num_epoch"]
+num_data = parameter["Deep_Learning"]["num_data"]
+num_partition = parameter["Deep_Learning"]["num_partition"]
+learning_rate = parameter["Deep_Learning"]["learning_rate"]
+num_testdata = parameter["Deep_Learning"]["num_testdata"]
+
+epsilon = parameter["Hyperparameter"]["epsilon"]
+
+K = parameter["Option"]["strike_price"]
+
+T = parameter["OU_Process"]["T"]
+alpha = parameter["OU_Process"]["alpha"]
+sigma = parameter["OU_Process"]["sigma"]
+x_0 = parameter["OU_Process"]["x_0"]
+
 h = 1e-4
 r = 0.01  #interest rate
 q = 0.008  #dividend
-T = 1  #expiration
+T = parameter["OU_Process"]["T"]  #expiration
 len_partition = T / num_partition
 
 #CPUとGPUどっちも使えるようにするやつ(Macはそんなに意味ないかも)
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-#device = torch.device('cuda:0')
-#print(device)
+
 print(torch.cuda.is_available())
 
 #print(torch.cuda.current_device())
@@ -68,7 +81,7 @@ class Net(nn.Module):
         return x
 
 
-#Phi オプションを行使したときのペイオフ、アメリカンオプションなので(x-K)^+
+#Phi オプションを行使したときのペイオフ、(アメリカン)オプションなので(x-K)^+
 def phi(X):
     y = [[float(max(x - K, 0))] for x in X]
     y = torch.tensor(y, requires_grad=True, dtype=torch.float32)
@@ -76,14 +89,22 @@ def phi(X):
 
 
 #データを生成(dataloaderとdatageneratorを使う)
-def data_gen(n=1000):
-    X = torch.tensor(np.random.uniform(low=a, high=b, size=n).reshape(n, 1),
+def OU_process_gen(n=1000):
+    OU_processes = np.array([simulate_OU(n, T, alpha, 0, sigma, x_0, False)[1]])
+    for i in range(n-1):
+        OU_processes = np.append(OU_processes, np.array([OU_model_generator.simulate_OU(n, T, alpha, 0, sigma, x_0, False)[1]]), axis=0)
+    """X = torch.tensor(np.random.uniform(low=a, high=b, size=n).reshape(n, 1),
                      requires_grad=False,
                      dtype=torch.float32)
     y = phi(X)
     dataset = TensorDataset(X, y)
+    dataloder = DataLoader(dataset, batch_size=100, shuffle=True)"""
+    return OU_processes.T
+
+def data_loder(X, y):
+    dataset = TensorDataset(X, y)
     dataloder = DataLoader(dataset, batch_size=100, shuffle=True)
-    return X, dataloder
+    return dataloder
 
 
 #数値微分
@@ -117,11 +138,58 @@ class CustomLoss(nn.Module):
         return loss
 
 
-def main():
-    traindataloder = data_gen(n=num_data)[1]
-    pre_model = phi
 
-    for i in tqdm(range(num_partition)):
+"""def test():
+    batch_size, feature_size = 3, 5
+    weights = torch.randn(feature_size, requires_grad=True)
+    def model(feature_vec):
+        # Very simple linear model with activation
+        return feature_vec.dot(weights).relu()
+    examples = torch.randn(batch_size, feature_size)
+    result = vmap(grad(model))(examples)
+    print(result)
+
+
+def test2():
+    
+    batch_size, feature_size = 3, 5
+    def model(weights, feature_vec):
+        # Very simple linear model with activation
+        assert feature_vec.dim() == 1
+        return feature_vec.dot(weights).relu()
+    def compute_loss(weights, example, target):
+        y = model(weights, example)
+        return ((y - target) ** 2).mean()  # MSELoss
+    weights = torch.randn(feature_size, requires_grad=True)
+    examples = torch.randn(batch_size, feature_size)
+    targets = torch.randn(batch_size)
+    inputs = (weights, examples, targets)
+    print(*inputs)
+    grad_weight_per_example = vmap(grad(compute_loss), in_dims=(None, 0, 0))(*inputs)"""
+
+def gradient(inputs, outputs):
+    d_points = torch.ones_like(outputs, requires_grad=False, device=outputs.device)
+    points_grad = grad(
+        outputs=outputs,
+        inputs=inputs,
+        grad_outputs=d_points,
+        create_graph=True,
+        retain_graph=True,
+        only_inputs=True)[0][:, -3:]
+    return points_grad
+
+def main():
+    """test2()
+    def test_model(x):
+        return model(x.reshape(-1, 1))"""
+    OU_processes = OU_process_gen(num_data)
+    y = phi(np.array([[input_data] for input_data in OU_processes[num_partition]]))
+
+    for i in tqdm(range(1,num_partition+1)):
+        X = torch.tensor(np.array([[input_data] for input_data in OU_processes[num_partition - i]]), requires_grad=False,
+                     dtype=torch.float32)
+        traindataloder = data_loder(X, y)
+
         model = Net()
         model = model.to(device)
         criterion = CustomLoss()
@@ -133,16 +201,22 @@ def main():
                 inputs = inputs.to(device)
                 target = target.to(device)
                 output = model(inputs)
-                diff = (model(inputs + h) - model(inputs - h)) / (2 * h)
+                #diff = (model(inputs + h) - model(inputs - h)) / (2 * h)
+             
+                #print(inputs)
+                #diff = jacrev(jacrev(model))
+                #diff = gradient(inputs, output)
+                diff = sec_diff(model, inputs)
+                
                 Phi = phi(inputs).to(device)
                 loss = criterion(output, target, diff, Phi)
                 loss.backward()
                 optimizer.step()
 
-            if n % 50 == 0:
-                print(loss)
+            #if n % 50 == 0:
+            #print(loss)
 
-        #テストデータをとる
+        """#テストデータをとる
         X = data_gen(n=num_testdata)[0]
         X = X.to(device)
         Xs = X.cpu().clone().detach().numpy().flatten().tolist()
@@ -165,9 +239,9 @@ def main():
 
         #-(r-q) * X x_diff
         #rqx_xdiff = (-1) * (r-q)
-        """#r * u 
+        #r * u 
         ru = r * model(X)
-        ru = ru .cpu().clone().detach().numpy().flatten().tolist()"""
+        ru = ru .cpu().clone().detach().numpy().flatten().tolist()
 
         #評価式　-(t偏微分) - 1/2 x^2 (x2階偏微分)
         left = [x + y for x, y in zip(t_diffs, xx_diffs)]
@@ -194,15 +268,11 @@ def main():
 
         #macならこっち
         value_df.to_csv(
-            "/Users/garammasala/sss21/csv/to_csv_out_{}.csv".format(i))
+            "/Users/garammasala/sss21/csv/to_csv_out_{}.csv".format(i))"""
 
         y = model(X).clone().detach().requires_grad_(True)
-        pre_model = model
-        pre_model = pre_model.to(device)
-        dataset = TensorDataset(X, y)
-        traindataloder = DataLoader(dataset, batch_size=100, shuffle=True)
 
-    firstX = []
+    """firstX = []
     Time = []
     for i in range(num_partition):
         #windows版
@@ -224,7 +294,7 @@ def main():
                 value = [x**2 for x in df["right"]]
                 firstX.append(df["X"][np.argmax(value)])
     plt.plot(Time, firstX)
-    plt.show()
+    plt.show()"""
 
 
 if __name__ == '__main__':

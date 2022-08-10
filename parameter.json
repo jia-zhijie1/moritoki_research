@@ -1,9 +1,9 @@
 {
     "Deep_Learning" : {
-        "num_epoch" : 100,
-        "num_data" : 1000,
-        "num_testdata" : 200,
-        "num_partition" : 100,
+        "num_epoch" : 10,
+        "num_data" : 100,
+        "num_testdata" : 100,
+        "num_partition" : 10,
         "learning_rate" : 0.01
     },
 

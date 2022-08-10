@@ -4,15 +4,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import math
 '''
 %matplotlib inline
 %config InlineBackend.figure_format = 'retina'
 '''
 
-e = math.e
-
-import parameter
+import json
+with open('parameter.json') as p:
+    parameter = json.load(p)
 
 #ブラウン運動の発生
 def brownian_motion(n, T):
@@ -45,7 +44,7 @@ def simulate_OU(n=100, T=1, theta=1, mu=0, sigma=1.2, x_0=0, fig_mode=False):
     X = np.zeros(n + 1)
     X[0] = x_0
 
-    for i, t in zip(range(n + 1), partition):
+    for i, t in zip(range(1, n + 1), partition[1:n+1]):
         X[i] = np.exp(-theta *
                    t) * x_0 + mu * (1 - np.exp(-theta * t)) + sigma * sum([
                        np.exp((-theta * (t - u))) * dB
@@ -82,13 +81,13 @@ def simulate_OU(n=100, T=1, theta=1, mu=0, sigma=1.2, x_0=0, fig_mode=False):
 
 #OUモデルの確認
 if __name__ == '__main__':
-    num_path = parameter.num_path
-    n = parameter.num_partition
-    T = parameter.T
-    alpha = parameter.alpha
-    sigma = parameter.sigma
-    x_0 = parameter.x_0
-    mu = parameter.mu
+    num_path = parameter["OU_Process"]["num_path"]
+    n = parameter["Deep_Learning"]["num_partition"]
+    T = parameter["OU_Process"]["T"]
+    alpha = parameter["OU_Process"]["alpha"]
+    sigma = parameter["OU_Process"]["sigma"]
+    x_0 = parameter["OU_Process"]["x_0"]
+    mu = parameter["OU_Process"]["mu"]
 
     fig, ax = plt.subplots()
 
